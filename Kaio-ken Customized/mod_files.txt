@@ -1,0 +1,5 @@
+add config.ini
+add kaioken.hmm
+add config.json
+remove kaioken.hmm.bak
+add mod.ini

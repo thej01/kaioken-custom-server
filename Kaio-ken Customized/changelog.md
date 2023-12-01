@@ -1,0 +1,16 @@
+## Kaio-ken Customizable x2, x4.2
+- [Addition] - Added configuration for Phantom Rush Readdition
+- [Addition] - Added configuration for maximum amount of charge
+- [Addition] - Added configuration to determine whether base Sonic's damage stats are affected by Kaio-ken
+- [Addition] - Added configuration to determine whether Kaio-ken is unlocked by Phantom Rush or not
+- [Addition] - Added update server
+- [Adjustment] - Changed config number ranges
+- [Refactor] - Changed ring drain functionality to be more intense
+- [Bugfix] - Fixed a softlock that would happen when dying in a titan fight while using Kaio-ken
+- [Bugfix] - Fixed a crash that would happen if no matching mod was found while loading config
+- [Bugfix] - Fixed a crash that would happen if no config.ini file was found
+- [Bugfix] - Fixed the ability to charge Kaio-ken to x1 (literally does nothing)
+- [Improvement] - Color coded console logging
+- [Amendment] - Fixed typos
+- [Removal] - Legacy ring drain system removed
+- [Removal] - Removed kaioken.hmm.bak

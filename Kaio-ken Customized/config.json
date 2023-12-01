@@ -1,0 +1,276 @@
+{
+  "Groups": 
+  [
+    {
+      "Name": "KaiokenConfig",
+      "DisplayName": "Kaio-ken",
+      "Elements":
+      [
+        {
+          "Name": "DamageMultiplier",
+          "DisplayName": "Damage Multiplier",
+		      "Description":
+          [
+			      "The damage multiplier per Kaio-ken level.\n\nDefault: 1x\nMax: 5x\nMin: 0.1x\n\n(Values lower than 0.5x may act strange)"
+		      ],
+          "Type": "float",
+          "MinValue": 0.1,
+          "MaxValue": 5,
+          "DefaultValue": 1
+        },
+
+        {
+          "Name": "DefenseMultiplier",
+          "DisplayName": "Defense Multiplier",
+		      "Description":
+          [
+			      "The defense multiplier per Kaio-ken level.\n\nDefault: 1x\nMax: 5x\nMin: 0.1x\n\n(Values lower than 0.5x may act strange)"
+		      ],
+          "Type": "float",
+          "MinValue": 0.1,
+          "MaxValue": 5,
+          "DefaultValue": 1
+        },
+
+        {
+          "Name": "SpeedMultiplier",
+          "DisplayName": "Speed Multiplier",
+		      "Description":
+          [
+			      "The speed multiplier per Kaio-ken level.\n\nDefault: 1x\nMax: 5x\nMin: 0.1x\n\n(Values lower than 0.5x may act strange)"
+		      ],
+          "Type": "float",
+          "MinValue": 0.1,
+          "MaxValue": 5,
+          "DefaultValue": 1
+        },
+
+        {
+          "Name": "DrainMultiplier",
+          "DisplayName": "Ring Drain Multiplier",
+		      "Description":
+          [
+			      "The ring drain multiplier per Kaio-ken level.\n\nDefault: 1x\nMax: 5x\nMin: 0.1x\n\n(Values lower than 0.5x may act strange)"
+		      ],
+          "Type": "float",
+          "MinValue": 0.1,
+          "MaxValue": 5,
+          "DefaultValue": 1
+        },
+
+        {
+          "Name": "AlwaysKaioken",
+          "DisplayName": "Kaio-ken Always Unlocked",
+		      "Description":
+          [
+			      "Determines if you need Phantom Rush unlocked to use Kaio-ken.\n\nDefault: Disabled"
+		      ],
+          "Type": "AlwaysKaioken",
+          "MinValue": null,
+          "MaxValue": null,
+          "DefaultValue": false
+        },
+
+        {
+          "Name": "ChargeMax",
+          "DisplayName": "Max Charge",
+		      "Description":
+          [
+			      "How far can you push your body?\n\nDefault: 20\nMin: 2\nMax: 99"
+		      ],
+          "Type": "int",
+          "MinValue": 2,
+          "MaxValue": 99,
+          "DefaultValue": 20
+        },
+
+        {
+          "Name": "KaiokenAffectBase",
+          "DisplayName": "Kaio-ken Attack Effects Base Sonic",
+		      "Description":
+          [
+			      "Determines if the attack buff from Kaio-ken affects base sonic.\n\nDefault: Enabled"
+		      ],
+          "Type": "KaiokenAffectBase",
+          "MinValue": null,
+          "MaxValue": null,
+          "DefaultValue": true
+        }
+      ]
+    },
+
+    {
+      "Name": "SS2Config",
+      "DisplayName": "Super Sonic 2",
+      "Elements":
+      [
+        {
+          "Name": "DoesSS2DrainExtra",
+          "DisplayName": "Drain Extra Rings as Super Sonic 2",
+		      "Description":
+          [
+			      "Determines if Super Sonic 2 drains extra rings while using Kaio-ken.\n\nDefault: Enabled"
+		      ],
+          "Type": "DoesSS2DrainExtra",
+          "MinValue": null,
+          "MaxValue": null,
+          "DefaultValue": true
+        },
+
+        {
+          "Name": "SS2DeathNum",
+          "DisplayName": "Super Sonic 2 Death Value",
+		      "Description":
+          [
+			      "Kills Super Sonic 2 when his rings drop below this value while using Kaio-ken.\n\nDefault: 50\nMin is 0\nMax is 200"
+		      ],
+          "Type": "int",
+          "MinValue": 0,
+          "MaxValue": 200,
+          "DefaultValue": 50
+        }
+      ]
+    },
+
+    {
+      "Name": "BalanceConfig",
+      "DisplayName": "Balancing",
+      "Elements":
+      [
+        {
+          "Name": "StatPresetID",
+          "DisplayName": "Stat Preset",
+		      "Description":
+          [
+			      "Choose between different stat presets.\n\nDefault: Nerfed Attack and Speed"
+		      ],
+          "Type": "StatPresets",
+          "MinValue": null,
+          "MaxValue": null,
+          "DefaultValue": 1
+        },
+
+        {
+          "Name": "PhantomRush",
+          "DisplayName": "Original Phantom Rush",
+          "Description":
+          [
+            "Allow Phantom Rush to be used without activating Kaio-ken.\n\nDefault: Enabled"
+          ],
+          "Type": "PhantomRush",
+          "MinValue": null,
+          "MaxValue": null,
+          "DefaultValue": true
+        }
+      ]
+    }
+  ],
+  "Enums":
+  {
+    "DoesSS2DrainExtra":
+    [
+      {
+        "DisplayName": "Enabled",
+        "Value": true,
+        "Description":
+        [
+          "Super Sonic 2 WILL drain extra rings while using Kaio-ken."
+        ]
+      },
+
+      {
+        "DisplayName": "Disabled",
+        "Value": false,
+        "Description":
+        [
+          "Super Sonic 2 will NOT drain extra rings while using Kaio-ken."
+        ]
+      }
+    ],
+
+    "StatPresets":
+    [
+      {
+        "DisplayName": "Original",
+        "Value": 0,
+        "Description":
+        [
+          "The original games stats."
+        ]
+      },
+
+      {
+        "DisplayName": "Nerfed Attack and Speed",
+        "Value": 1,
+        "Description":
+        [
+          "Halfed Speed and Attack.\nSlightly more defense."
+        ]
+      }
+    ],
+
+    "PhantomRush":
+    [
+      {
+        "DisplayName": "Enabled",
+        "Value": true,
+        "Description":
+        [
+          "Phantom Rush will be usable even WITHOUT Kaio-ken."
+        ]
+      },
+
+      {
+        "DisplayName": "Disabled",
+        "Value": false,
+        "Description":
+        [
+          "Phantom Rush will ONLY be usable with Kaio-ken."
+        ]
+      }
+    ],
+
+    "AlwaysKaioken":
+    [
+      {
+        "DisplayName": "Enabled",
+        "Value": true,
+        "Description":
+        [
+          "Kaioken will always be UNLOCKED."
+        ]
+      },
+
+      {
+        "DisplayName": "Disabled",
+        "Value": false,
+        "Description":
+        [
+          "Kaioken will LOCKED behind the Phantom Rush skill."
+        ]
+      }
+    ],
+
+    "KaiokenAffectBase":
+    [
+      {
+        "DisplayName": "Enabled",
+        "Value": true,
+        "Description":
+        [
+          "Kaio-ken attack buff WILL affect base Sonic."
+        ]
+      },
+
+      {
+        "DisplayName": "Disabled",
+        "Value": false,
+        "Description":
+        [
+          "Kaio-ken attack buff will NOT affect base Sonic."
+        ]
+      }
+    ]
+  },
+  "IniFile": "config.ini"
+}

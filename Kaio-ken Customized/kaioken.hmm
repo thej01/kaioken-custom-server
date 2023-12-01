@@ -1,0 +1,723 @@
+Code "Kaioken" in "Goofy codes"
+//
+	#include "Reflection" noemit
+	
+	#import "GOComponents"
+    #import "PlayerVisuals"
+
+    #lib "GameObject"
+    #lib "Player"
+    #lib "Time"
+    #lib "SonicParameters"
+	#lib "Sonic"
+    #lib "Bitwise"
+	#lib "BlackboardItem"
+	#lib "Reflection"
+	#lib "BlackboardStatus"
+	#lib "BlackboardBattle"
+	#lib "HMM"
+	#lib "INI"
+	
+	#import "Plugins"
+
+	using System.IO;
+    using System.Collections.Generic;
+
+	var SonicParametersInfo = Reflection.GetDataInfo<SonicParameters.Root>("player_common");
+
+	//  Don't change any of these values, these are values which should stay as are. Only exception is "charge"
+    static bool Kaioken = false;
+	static bool Charging = false;
+	static bool KaiokenOn = false;
+	static bool isSuper = false;
+
+    static float charge = 1; // This is the Kaio-ken's level. It begins at 1 and should never be below 0. While I don't recommend it, you can change the  charge to start  at a higher number.
+    static float CoolDown = 0;
+    static float DrainSpeed = 0;
+    static float DamageMin = 0;
+    static float DamageMax = 0;
+	static float DefenseMin = 0;
+    static float DefenseMax = 0;
+	static float SS2RingDrain = 0;
+	static float RingDrainDelay = 0;
+	static float CanKaioKen = 0;
+	static float DeltaTime = 0;
+	static float PhantomRushReactiveDelay = 0;
+	
+	// config (minus stat preset, it's a little further down)
+	// don't touch these incase loading the config goes horribly wrong
+	static float DamageMultiplier = 1;
+	static float DefenseMultiplier = 1;
+	static float SpeedMultiplier = 1;
+	static float DrainMultiplier = 1;
+
+	static bool CanAlwaysKaioken = false; // allows you to use Kaio-ken even if you haven't unlocked Phantom Rush.
+
+	static int ChargeMax = 20; // i think you can guess what this one does.
+
+	static bool KaiokenAffectsBase = false; // attack buff will affect sonic
+
+	static int SS2DeathNum = 50;
+
+	static bool DoesSS2DrainExtra = true;
+
+	static bool ExperimentalPhantomRushReaddition = true; // A super experimental method of keeping both phantom rush and Kaio-Ken.
+														 // Main issue with this is your combo meter just gets reset to whatever Kaio-Ken level
+														 // you were after disabling Kaio-Ken.
+
+	static bool ConfigInitialised = false;
+
+	// fun settings, feel free to mess with these!
+
+	const string ModName = "Kaio-ken Customizable"; // make sure to change this to whatever the mod.ini calls the mod or else the 
+												  // config WILL NOT WORK!
+
+	const bool IsSS2DrainAffectedByMult = true; // determines if the extra SS2 ring drain is affected by the drain multiplier 
+												// setting in the config.
+
+	const bool SS2DrainExtraKaioken = true; // determines if the extra SS2 Ring drain requires Kaio-Ken to be active.
+
+	const bool NewRingDrainMethodFast = true; // couldnt think of a better name for this but basically
+											  // if we overshoot the amount of DrainSpeed that we need to drain 1 ring,
+											  // we start to increase the amount of rings drained 
+											  // ex: if we needed 0.5 drainspeed but we have 1 DrainSpeed, than we drain 2 rings.
+											  // this was made to get by the cap of about 15 rings a second on the new ring draining method.
+											  // NOTE: this gets HARSH. on charge level 10, we drain about 30 rings a second.
+
+	static float ChargeTimeNeeded = 0.5f; // the amount of time needed to charge a Kaio-ken level. (0.5 is 1 second i believe.)
+					
+	// don't touch these
+
+	static float ChargeMultDamage = 1;
+	static float ChargeMultDefense = 1;
+	static float ChargeMultSpeed = 1;
+	static float ChargeMultDrain = 1;
+
+	// debugging
+
+	const bool DoLogs = true;
+	const bool DoLogSpam = true; // some logs run every frame, set fo false disable those logs specifically
+
+	// normal, warn, and error (well not error more of a "something horrible has happened"), and config debug specifically
+	const ConsoleColor ColorGray = ConsoleColor.Gray;
+	const ConsoleColor ColorYellow = ConsoleColor.Yellow;
+	const ConsoleColor ColorRed = ConsoleColor.Red;
+	const ConsoleColor ColorGreen = ConsoleColor.Green;
+	const string MissingLog = "If you're reading this, you forgot to put text for a KaioLog function somewhere!";
+
+	void KaioLog(string message = MissingLog, ConsoleColor color = ColorGray)
+	{
+		if (DoLogs)
+		{
+			Console.ForegroundColor = color;
+			Console.WriteLine(ModName + ": " + " " + message);
+		}
+		Console.ForegroundColor = ConsoleColor.White;
+	}
+
+	void KaioLogSpam(string message = MissingLog, ConsoleColor color = ColorGray)
+	{
+		if (DoLogSpam)
+			KaioLog(message, color);
+	}
+	
+	const int PRESET_ORIGINAL = 0;
+	const int PRESET_NERFED_ATTACK_AND_SPEED = 1;
+	int StatPresetID = PRESET_NERFED_ATTACK_AND_SPEED;
+
+	// this dictionary contains dictionaries for every preset which contain stat values.
+	// its pretty easy to add your own stat presets with this system, so feel free.
+	static Dictionary<int, Dictionary<string, float>> Preset_Data = new Dictionary<int, Dictionary<string, float>>
+	{
+		// PRESET_ORIGINAL
+		{ 0, new Dictionary<string, float> 
+		
+			{ 
+				{ "DamageMin", 10.0f },
+				{ "DamageMax", 40.0f },
+				{ "DefenseMin", 0.0f },
+				{ "DefenseMax", 75.0f },
+
+				// Multiplier of how fast time goes when in bullet time
+			
+				{ "frozenTime", 0.26f },
+
+				// normal1 and 2 are the values of low and fast walking speed.
+
+				// The normal1 and normal2 values currently don't do anything as of X4.1, but just in case.
+				{ "normal", 0.5f }, // 0.5 because we add half of charge to it (charge is always at least 1)
+				{ "normal2", 10.7f }, // 10.7 because same reason but its a third
+
+				// boost1 and 2 are the values of low and fast boosting speed.
+
+				{ "boost", 19.7f }, // ditto, you get it by now
+				{ "boost2", 29.95f },
+
+				// boostLvMax1 and 2 are the values of low and fast boosting speed at Lv99
+
+				{ "boostLvMax", 19.5f },
+				{ "boostLvMax2", 59.75f },
+				{ "DamageMinSS2", 10.0f },
+				{ "DamageMaxSS2", 40.0f },
+				{ "DamageMinSS", 10.0f },
+				{ "DamageMaxSS", 40.0f },
+
+				// maxSpeed is the value of flying as Super Sonic
+
+				{ "maxSpeedSS2", 80.0f }, // charge offset
+
+				// maxDashSpeed is the value of flying while boosting as Super Sonic
+
+				{ "maxDashSpeedSS2", 160.0f }, // charge offset 2
+				{ "maxSpeedSS", 80.0f },
+				{ "maxDashSpeedSS", 160.0f }
+			} 
+		},
+		// PRESET_NERFED_ATTACK_AND_SPEED
+		{ 1, new Dictionary<string, float> 
+		 
+			{ 
+				{ "DamageMin", 3.0f },
+				{ "DamageMax", 15.0f },
+				{ "DefenseMin", 15.0f },
+				{ "DefenseMax", 77.0f },
+				{ "frozenTime", 1.0f },
+				{ "normal", 1.0f }, 
+				{ "normal2", 5.0f }, 
+				{ "boost", 20.0f },
+				{ "boost2", 25.0f },
+				{ "boostLvMax", 25.0f },
+				{ "boostLvMax2", 35.0f },
+				{ "DamageMinSS2", 10.0f },
+				{ "DamageMaxSS2", 25.0f },
+				{ "DamageMinSS", 3.0f },
+				{ "DamageMaxSS", 15.0f },
+				{ "maxSpeedSS2", 60.0f },
+				{ "maxDashSpeedSS2", 260.0f },
+				{ "maxSpeedSS", 30.0f },
+				{ "maxDashSpeedSS", 130.0f },
+			} 
+		}
+    };
+
+	// make an empty dictionary to store one of these sub dictionaries later.
+	static Dictionary<string, float> Preset_Needed = new Dictionary<string, float>();
+
+	void LogPresetNeededKeys()
+	{
+		KaioLog("Current Preset Values:", ColorGreen)
+		foreach (var key in Preset_Needed)
+		{
+			KaioLog($"{key.Key}: {key.Value}", ColorGreen);
+		}
+	}
+
+	void Init_Preset(int id)
+	{
+		// check if the sub dictionary for id is not null
+		if (Preset_Data.ContainsKey(id))
+		{
+			KaioLog("Attempting to copy preset data with an id of " + id.ToString() + ".", ColorGreen);
+			Preset_Needed = new Dictionary<string, float>(Preset_Data[id]);
+			KaioLog("Succesfully copied preset data.", ColorGreen);
+		}
+		else
+		{
+			// if it is oh crap we gotta default to PRESET_NERFED_ATTACK_AND_SPEED oh no this is bad
+			KaioLog("*!!* Preset data didn't contain id: " + id.ToString() + ", attempting to default with PRESET_NERFED_ATTACK_AND_SPEED. (invalid configuration or missing sub dictionary?)", ColorRed);
+			Preset_Needed = new Dictionary<string, float>(Preset_Data[PRESET_NERFED_ATTACK_AND_SPEED]);
+			KaioLog("Stat Preset succesfully defaulted to 1. Crisis averted.", ColorYellow)
+		}
+	}
+
+	void Init_Config()
+	{
+		// 100% not stolen from drift mod by Trepe Serafin because i know how to code configs
+
+		// find mod folder directiory
+		var modsQuery = HMM.FindModsByName(ModName);
+
+		// see if we found the mod folder
+		if (modsQuery.Count <= 0)
+		{
+			KaioLog("*!!* No mod matches ModName string! Config cannot be loaded.", ColorRed);
+			// since we skip loading the config, make sure we do this so the mod still works!
+			Init_Preset(StatPresetID);
+			return;
+		}
+
+		// get config.ini directory from mod 0
+		string modConfigIniPath = System.IO.Path.Combine(modsQuery[0].Path, "config.ini");
+
+		// let the console know if there are for some reason more than 1 mod with the same name?!
+		if (modsQuery.Count > 1)
+			KaioLog("!! Mod with duplicated name enabled! Loading mod 0's config.", ColorYellow);
+
+		// make sure the config.ini file actually exists
+		if (!File.Exists(modConfigIniPath))
+		{
+			KaioLog("*!!* config.ini couldn't be found at: \"" + modConfigIniPath + "\"! Config cannot be loaded.", ColorRed)
+			Init_Preset(StatPresetID);
+			return;
+		}
+
+		// load the ini file
+		var ini = INI.Read(modConfigIniPath);
+
+		// gets the value from the ini file and drops it in DamageMultiplier
+		float.TryParse(ini["KaiokenConfig"]["DamageMultiplier"], out DamageMultiplier);
+
+		KaioLog("Current DamageMultipier is: " + DamageMultiplier.ToString(), ColorGreen);
+
+		float.TryParse(ini["KaiokenConfig"]["DefenseMultiplier"], out DefenseMultiplier);
+
+		KaioLog("Current DefenseMultipier is: " + DefenseMultiplier.ToString(), ColorGreen);
+
+		float.TryParse(ini["KaiokenConfig"]["SpeedMultiplier"], out SpeedMultiplier);
+
+		KaioLog("Current SpeedMultipier is: " + SpeedMultiplier.ToString(), ColorGreen);
+
+		float.TryParse(ini["KaiokenConfig"]["DrainMultiplier"], out DrainMultiplier);
+
+		KaioLog("Current DrainMultiplier is: " + DrainMultiplier.ToString(), ColorGreen);
+
+		bool.TryParse(ini["KaiokenConfig"]["AlwaysKaioken"], out CanAlwaysKaioken);
+
+		KaioLog("CanAlwaysKaioken: " + CanAlwaysKaioken.ToString(), ColorGreen);
+
+		int.TryParse(ini["KaiokenConfig"]["ChargeMax"], out ChargeMax);
+
+		KaioLog("ChargeMax: " + ChargeMax.ToString(), ColorGreen);
+
+		bool.TryParse(ini["KaiokenConfig"]["KaiokenAffectBase"], out KaiokenAffectsBase);
+
+		KaioLog("KaiokenAffectsBase: " + KaiokenAffectsBase.ToString(), ColorGreen);
+
+		// if you've been wondering why ive been using the built in INI reader instead of HMM's one,
+		// its because SS2 Extra drain was ALWAYS true despite the ini saying otherwise
+		// i think it was some case sensitive thing?
+		// either way this works, so...
+
+		bool.TryParse(ini["SS2Config"]["DoesSS2DrainExtra"], out DoesSS2DrainExtra)
+
+		KaioLog("Is SS2 Extra Drain On: " + DoesSS2DrainExtra.ToString(), ColorGreen);
+
+		int.TryParse(ini["SS2Config"]["SS2DeathNum"], out SS2DeathNum);
+
+		KaioLog("SS2 Death Num: " + SS2DeathNum.ToString(), ColorGreen);
+
+		int.TryParse(ini["BalanceConfig"]["StatPresetID"], out StatPresetID);
+
+		KaioLog("StatPresetID: " + StatPresetID.ToString(), ColorGreen);
+
+		bool.TryParse(ini["BalanceConfig"]["PhantomRush"], out ExperimentalPhantomRushReaddition);
+
+		KaioLog("Original Phantom Rush: " + ExperimentalPhantomRushReaddition.ToString(), ColorGreen)
+
+		Init_Preset(StatPresetID);
+
+		LogPresetNeededKeys();
+
+		// it worked
+		//KaioLog("!! This isn't an actual warning, just me seeing if the yellow stuff works.", ColorYellow);
+		//KaioLog("*!!* This isn't an actual error, just me seeing if the red stuff works.", ColorRed);
+	}
+
+	if (!ConfigInitialised)
+	{
+		Init_Config();
+		ConfigInitialised = true;
+	}
+
+	float Access_PresetNeededKey(string Key)
+	{
+		float KeyValue = 0.0f;
+		if (Preset_Needed.TryGetValue(Key, out KeyValue))
+			return KeyValue;
+
+		KaioLogSpam("*!!* Key: " + Key + " doesn't exist in Preset_Needed! Defaulting with a value of 0.0f.", ColorRed)
+		return 0.0f;
+	}
+//
+{
+	
+// TODO: figure out how to see if the games paused or in a cutscene so we don't drain extra rings
+var pStatePluginBattle = Player.State.GetStatePlugin<StatePluginBattle>(); // Everything until the next comment shouldn't be changed
+
+if (pStatePluginBattle == null)
+    return;
+
+	bool isCyberSpace = IS_WORLD_FLAG(IsCyberSpace);
+
+	var pBlackboardItem = BlackboardItem.Get();
+
+	isSuper = BlackboardStatus.IsSuper();
+
+	if (!isCyberSpace)
+	{
+		DeltaTime = Time.GetDeltaTime();
+		float currentSpeed = Player.Kinematics.GetHorizontalMagnitude();
+
+		if (Player.GetPlayerType() != Player.PlayerType.Sonic)
+			return;
+
+		if (pBlackboardItem == null)
+        	return;
+	
+		var pBlackboardBattle = BlackboardBattle.Get();
+
+		// If the player is currently in a titan fight
+		bool isBoss = Player.State.GetStatePlugin("StatePluginBossBattle") != null;
+
+		if (pBlackboardBattle == null)
+			return;
+
+		// everything below handles charging the Kaio-ken
+
+		if (currentSpeed == 0 && Player.Input.IsDown(Player.InputActionType.PlayerCyloop) && Player.Input.IsDown(Player.InputActionType.PlayerBoost)) // This is the starting activation of the Kaio-ken. This should not be changed but if you wished, you can change "currentSpeed ==" to  "currentSpeed <=" and the 0 to the maximum speed Sonic can be while still able to use the Kaio-ken
+		{
+			if (pBlackboardItem->RingCount > 0)
+			{
+				if (Player.Input.IsDown(Player.InputActionType.PlayerLightDash)) // This is the charging sections. When the player holds the Lightspeed Dash button, the Kaio-ken charges.
+				{
+					Player.Effect.PlayEffect("Kaioken", "ec_so_skill_accelerator_aura01_par01") // All PlayEffects control cemts. Cemts are the various effects, such as Wild Rush's lightning
+					Player.Effect.PlayEffect("Kaioken", "ec_so_skill_accelerator_aura01_lightning01")
+					Player.Effect.StopEffect("Kaioken") // This ends all PlayEffects related to it's name.
+
+					if (charge < ChargeMax) // This is your maximum Kaio-ken level.
+					{
+						if (CoolDown > ChargeTimeNeeded) // This is what controls how fast the Kaio-ken charges. Once CoolDown goes above ChargeTimeNeeded, it is reset to 0 and the charge goes up.
+						{
+							charge += 1;
+							CoolDown = 0;
+						}
+						CoolDown += DeltaTime;
+					}
+				}
+				Charging = true; // This tells the code that you are charging your Kaio-ken.
+			}
+		}
+		else
+		{
+			CoolDown = 0.5f;
+			Charging = false; // When you stop holding the two input buttons to start the charge, the Kaio-ken stops charging.
+			if (!Kaioken)
+			{
+				charge = 1;
+			}
+		}
+    
+    
+		if (Charging && Player.Input.IsReleased(Player.InputActionType.PlayerLightDash)) // This makes it so you must release the Lightspeed Dash but continue holding the Cyloop and Boost buttons
+		{
+			Player.Effect.StopEffect("Kaioken")
+			// if our charge isnt even greater than 1, then don't even finish the charge.
+			if (!Kaioken && charge >= 2) // This controls whether you should activate the Kaio-ken or not.
+			{
+				Kaioken = true;
+				if (!isSuper)
+					Player.State.SetState(Sonic.StateID.StateAwakening);
+				if (ExperimentalPhantomRushReaddition)
+				{
+					pBlackboardBattle->PhantomRushAmount = 0.0f;
+					// If the hud is greater than our charge amount, it will not display the value as the combo counter cannot count down.
+					// To fix that, we disable phantom rush, but this isn't an issue as it will be turned back on soon enough.
+					PhantomRushReactiveDelay = 0.033f; // To make sure it doesn't reactivate too soon, we delay by 0.033 seconds.
+				}
+			}
+			else
+			{
+				Kaioken = false;
+				charge = 1;
+			}
+		}
+    
+		if (Kaioken) // Everything here relates to the Kaio-ken
+		{
+			// everything below handles the display of the Kaio-ken level and Phantom rush
+
+			if (ExperimentalPhantomRushReaddition)
+			{
+				if (PhantomRushReactiveDelay <= 0)
+					pBlackboardBattle->PhantomRushAmount = 120.0f;
+				PhantomRushReactiveDelay -= DeltaTime;
+			}
+			else
+			{
+				pBlackboardBattle->PhantomRushAmount = 120.0f; // This is what sets your Phantom Rush to be active
+			}
+			pBlackboardBattle->ComboCount = (int)(charge); // This shows your Kaio-ken level
+
+			// everything below handles ring consumption
+
+			ChargeMultDrain = charge * DrainMultiplier;
+			//KaioLogSpam("Drain Speed is: " + ChargeMultDrain.ToString(), ColorGray);
+			float DrainPerFrame = (ChargeMultDrain * DeltaTime);
+			if (pBlackboardItem->RingCount > 0) // This detects if your rings are 1 or higher, so you don't end up with negative rings.
+			{
+				// Legacy ring drain code, doesnt work with drain multiplier.
+
+				/*if (charge > 20) // This detects if your Kaio-ken level is above 20. Once your  Kaio-ken reaches 20, the original ring drain broke, so it gets replaced with a different one
+				{
+					if ( DrainSpeed > (0.05f)) // This makes your rings drain quickly. Every time DrainSpeed is above this value, DrainSpeed resets and you lose rings
+					{
+						pBlackboardItem->RingCount -= (int)Math.Round((10 * charge) / 7); // This is what controls how many rings you lose. It's default value makes you lose 30 rings at Kaio-ken x21
+						DrainSpeed = 0;
+					}
+				}
+				else
+				{
+					if ( DrainSpeed > (0.8f / charge)) // This makes your drain speed change based off the Kaio-ken level
+					{
+						pBlackboardItem->RingCount -= 1; // This makes you lose one ring.
+						DrainSpeed = 0;
+					}
+				}*/
+
+				float DrainSpeedNeeded = 0.8f / charge;
+				if (DrainSpeed > DrainSpeedNeeded)
+				{ 
+					if (RingDrainDelay <= 0)
+					{
+						int RingDrain = 1
+						if (NewRingDrainMethodFast)
+						{
+							// takes overflow value from the drainspeed and basically multiplies our drain via that
+							// so if we have enough drainspeed to surprass the needed by 2, we drain 2 rings.
+							RingDrain = (int)Math.Floor(DrainSpeed / DrainSpeedNeeded);
+							//KaioLogSpam("Rings drained per tick: " + RingDrain.ToString(), ColorGray);
+						}
+						pBlackboardItem->RingCount -= RingDrain;
+						DrainSpeed = 0;
+						RingDrainDelay = 0.066f; // activate delay (this says 0.066, but it is technically 0.033 because we subtract after this)
+												 // which caps ring drain at 1/30th of a second
+					}
+				}
+				RingDrainDelay -= DeltaTime;
+
+				if (RingDrainDelay <= 0)
+					DrainSpeed += DrainPerFrame // This is the ring drain timer, do not mess with it.
+			
+			}
+			// oops you can go into ring debt with the NewRingDrainMethodFast
+			if (pBlackboardItem->RingCount < 0)
+				pBlackboardItem->RingCount = 0;
+
+			// everything below handles the effects when using Kaio-ken
+		
+			if (!KaiokenOn) // This detects if the effects should play.
+			{
+				Player.Effect.PlayEffect("Kaioken", "ec_ft_dash_ge01_dist03")
+				Player.Effect.PlayEffect("Kaioken", "ec_ft_dash_ge01_dist02")
+				Player.Effect.PlayEffect("Kaioken", "ec_ft_dash_ge01_dist01")
+				Player.Effect.PlayEffect("Kaioken", "ec_ss_aura01_default_gpu01")
+				Player.Effect.PlayEffect("Kaioken", "ef_ss_stomp_loop01")
+				Player.Effect.PlayEffect("Kaioken", "ef_so_stomp_loop01")
+				Player.Effect.PlayEffect("Kaioken", "ec_so_cyloop_attract_hit01_impact01")
+				Player.Effect.PlayEffect("Kaioken", "ec_so_skill_accelerator_aura01_gpu01")
+				Player.Effect.PlayEffect("Kaioken", "ec_so_skill_accelerator_aura01_lightning01")
+				Player.Effect.PlayEffect("Kaioken", "ec_ss_aura01_default_undulation01")
+				Player.Effect.PlayEffect("Kaioken", "ef_ob_seed01_powerseed01_sonicbuff01")
+				KaiokenOn = true; // The effects will keep playing forever if this variable doesn't turn off.
+			}
+
+			// everything below handles disabling Kaio-ken
+
+			if (pBlackboardItem->RingCount <= 0) // This detects if your rings are 0 or below 0.
+			{
+				if ((isSuper || charge >= 10) && !isBoss) // This detects if the Kaio-ken is 10 or higher, or if you're Super Sonic
+				{
+					Player.State.SetState(Sonic.StateID.StateDead);// This kills Sonic
+				}
+				Kaioken = false; // This forcibly disables Kaio-ken
+			}
+
+			// This code block disables Kaio-ken if you haven't unlocked Phantom Rush.
+
+			if (!CanAlwaysKaioken)
+			{
+				bool isPhantomRush = pStatePluginBattle->Flags.HasFlag(StatePluginBattle.BattleFlags.IsPhantomRush);
+				if (!isPhantomRush) // This detects if Phantom Rush is inactive
+				{
+					if (CanKaioKen > 0.1) // When CanKaioKen goes above this value, Kaio-ken is disabled
+					{
+						Kaioken = false;
+						CanKaioKen = 0;
+					}
+					CanKaioKen += DeltaTime; // This starts the timer on if Kaio-ken can continue
+				}
+				else // This allows Kaio-ken to activate
+				{
+					CanKaioKen = 0;
+				}
+			}
+		}
+		else
+		{
+			if (!ExperimentalPhantomRushReaddition)
+				pBlackboardBattle->PhantomRushAmount = 0.0f; // This disables Phantom Rush
+			Player.Effect.StopEffect("Kaioken")
+			KaiokenOn = false // This disables Kaio-ken's effects
+		}
+
+		// everything below handles the stat buffs (excl SS1 and SS2)
+
+		ChargeMultDamage = charge * DamageMultiplier;
+		ChargeMultSpeed = charge * SpeedMultiplier;
+		ChargeMultDefense = charge * DefenseMultiplier; 
+		//KaioLogSpam("DefenseMax: " + DefenseMax.ToString(), ColorGray)
+
+		if (!Kaioken) // this prevents the multiplier config affecting base stats.
+			ChargeMultDefense = 1;
+
+		if (!Kaioken)
+			ChargeMultDamage = 1;
+									
+		if (!Kaioken)
+			ChargeMultSpeed = 1;
+
+		if (Kaioken && ChargeMultDefense <= 1) // prevent lowering config values like 0.4x nerfing you when you use Kaio-ken (ironic)
+			ChargeMultDefense = 1;
+		
+		if (Kaioken && ChargeMultDamage <= 1)
+			ChargeMultDamage = 1;
+
+		if (Kaioken && ChargeMultSpeed <= 1)
+			ChargeMultSpeed = 1;
+
+
+		if (!isSuper)
+		{
+			if (KaiokenAffectsBase)
+			{
+				DamageMin = Access_PresetNeededKey("DamageMin") * ChargeMultDamage; 
+				DamageMax = Access_PresetNeededKey("DamageMax") * ChargeMultDamage;
+			}
+			else
+			{
+				DamageMin = Access_PresetNeededKey("DamageMin");
+				DamageMax = Access_PresetNeededKey("DamageMax");
+			}
+		}
+
+		DefenseMin = (float)((0.75 * ChargeMultDefense) + Access_PresetNeededKey("DefenseMin")); // This is your minimum defense, which affects how many rings Sonic loses when hit. In vanilla, the whole number would be 0
+		DefenseMax = (float)((0.75 * ChargeMultDefense) + Access_PresetNeededKey("DefenseMax")); // This is your maximum defense, which affects how many rings Sonic loses when hit. In vanilla, the whole number would be 75
+
+		// Every thing down here controls the RFL changes
+
+		if (SonicParametersInfo.pData == null)
+		{
+			KaioLogSpam("*!!* SonicParametersInfo is null!", ColorRed);
+			return;
+		}
+		// normal.initial controls your starting speed at low starting speed. Vanilla has it at 1.
+		// normal2.initial controls your starting speed at max starting speed. Vanilla has it at 11.
+		// boost.initital controls your boost speed at low boosting speed. Vanilla has this at 20.
+		// boost2.initial controls your boost speed at max boosting speed. Vanilla has this at 30.
+		// boostLvMax.initital controls your powerboost speed at low boosting speed. Vanilla has this at 20.
+		// boostLvMax2.initial controls your powerboost speed at max boosting speed. Vanilla has this at 60.
+		// frozenTime controls how slow time gets when you parry, with 1 being fullspeed and 0 being completely frozen. Vanilla has this at 0.26.
+		// maxSpeed controls Super Sonic's non boost speed. Vanilla has this at 85
+		// maxDashSpeed controls Super Sonic's boost speed. Vanilla has this at 170
+		RFL_SET_PARAM(SonicParametersInfo, common.commonPackage.attack.common.offensive.pointMin, (byte)DamageMin);
+		RFL_SET_PARAM(SonicParametersInfo, common.commonPackage.attack.common.offensive.pointMax, (byte)DamageMax);
+		RFL_SET_PARAM(SonicParametersInfo, common.commonPackage.attack.common.defensive.rateMin, (byte)DefenseMin);
+		RFL_SET_PARAM(SonicParametersInfo, common.commonPackage.attack.common.defensive.rateMax, (byte)DefenseMax);
+		RFL_SET_PARAM(SonicParametersInfo, forwardView.modePackage.parry.frozenTime, (float)(Access_PresetNeededKey("frozenTime") / charge));
+
+		// This was removed in X4.1
+
+		//RFL_SET_PARAM(SonicParametersInfo, forwardView.modePackage.speed.normal.initial, (float)((0.5 * ChargeMultSpeed) + Access_PresetNeededKey("normal")));
+		//RFL_SET_PARAM(SonicParametersInfo, forwardView.modePackage.speed.normal2.initial, (float)((0.3 * ChargeMultSpeed) + Access_PresetNeededKey("normal2")));
+		RFL_SET_PARAM(SonicParametersInfo, forwardView.modePackage.speed.boost.initial, (float)((0.3 * ChargeMultSpeed) + Access_PresetNeededKey("boost")));
+		RFL_SET_PARAM(SonicParametersInfo, forwardView.modePackage.speed.boost2.initial, (float)((0.05 * ChargeMultSpeed) + Access_PresetNeededKey("boost2")));
+		RFL_SET_PARAM(SonicParametersInfo, forwardView.modePackage.speed.boostLvMax.initial, (float)((0.5 * ChargeMultSpeed) + Access_PresetNeededKey("boostLvMax")));
+		RFL_SET_PARAM(SonicParametersInfo, forwardView.modePackage.speed.boostLvMax2.initial, (float)((0.25 * ChargeMultSpeed) + Access_PresetNeededKey("boostLvMax2")));
+
+		// NOTE: This wasn't in the !IsCyberSpace statement before.
+		// i've gone ahead and fixed that.
+
+		// everything below handles the SS1 and SS2 stat buffs
+
+		var data = Player.GetPlayerData();
+		if (data == null)
+			return;
+
+		var gocVisual = GameObject.GetGOC<GOCPlayerVisual>(&data->GameObject);
+		if (gocVisual == null)
+			return;
+
+		var visual = gocVisual->GetVisual<VisualSuperSonic>();
+		if (visual == null)
+			return;
+
+		//KaioLogSpam("DamageMax: " + DamageMax.ToString(), ColorGray)
+		if (visual->IsSuperSonic2) // Super Sonic 2's unique stats. Vanilla would not have this
+		{
+			//KaioLogSpam("Super Sonic 2 active!", ColorGray);
+			DamageMin = (ChargeMultDamage * Access_PresetNeededKey("DamageMinSS2")); // This is your minimum damage. In vanilla, this would be 10.
+			DamageMax = (ChargeMultDamage * Access_PresetNeededKey("DamageMaxSS2")); // This is your maximum damage. In vanilla, this would be 40
+			
+			// Everything down here controls the RFL changes
+
+			if (SonicParametersInfo.pData == null)
+				return;
+			RFL_SET_PARAM(SonicParametersInfo, forwardView.fly.maxSpeed, (float)((15 * ChargeMultSpeed) + Access_PresetNeededKey("maxSpeedSS2")));
+			RFL_SET_PARAM(SonicParametersInfo, forwardView.fly.maxDashSpeed, (float)((30 * ChargeMultSpeed) + Access_PresetNeededKey("maxDashSpeedSS2")));
+
+			if (pBlackboardItem == null)
+				return;
+
+			if (DoesSS2DrainExtra)
+			{
+				if (SS2DrainExtraKaioken && !Kaioken)
+					SS2RingDrain = 0;
+				if (SS2RingDrain > 2) // Additional ring drain as Super Sonic 2
+				{
+					//KaioLogSpam("SS2 is draining extra.", ColorGray)
+					if (pBlackboardItem->RingCount > 5 && charge >= 1)
+						{
+							pBlackboardItem->RingCount -= 1;
+							SS2RingDrain = 0;
+							// ring debt again...
+							if (pBlackboardItem->RingCount < 0)
+								pBlackboardItem->RingCount = 0;
+						}
+				}
+				
+				if (IsSS2DrainAffectedByMult)
+					SS2RingDrain += (DrainMultiplier * DeltaTime);
+				else
+					SS2RingDrain += DeltaTime;
+			}
+			
+			//KaioLogSpam("SS2DeathNum is: " + SS2DeathNum.ToString(), ColorGray);
+			if (pBlackboardItem->RingCount <= SS2DeathNum) // This detects if your rings are 50 or below 0.
+			{
+				if (visual->IsSuperSonic2 && charge > 1) // This detects if Super Sonic 2 is active
+				{
+					if (isBoss)
+						pBlackboardItem->RingCount = 0;
+					else
+						Player.State.SetState(Sonic.StateID.StateDead);// This kills Sonic
+				}
+				Kaioken = false; // This forcibly disables Kaio-ken
+			}
+		}
+		else // SS1 Stats
+		{
+			DamageMin = (ChargeMultDamage * Access_PresetNeededKey("DamageMinSS")); // This is your minimum damage. In vanilla, this would be 10.
+			DamageMax = (ChargeMultDamage * Access_PresetNeededKey("DamageMaxSS")); // This is your maximum damage. In vanilla, this would be 40
+			
+			// Everything down here controls the RFL changes
+
+			if (SonicParametersInfo.pData == null)
+				return;
+			
+			RFL_SET_PARAM(SonicParametersInfo, forwardView.fly.maxSpeed, (float)((5 * ChargeMultSpeed) + Access_PresetNeededKey("maxSpeedSS")));
+			RFL_SET_PARAM(SonicParametersInfo, forwardView.fly.maxDashSpeed, (float)((10 * ChargeMultSpeed) + Access_PresetNeededKey("maxDashSpeedSS")));
+		}
+				
+	}
+		
+}
